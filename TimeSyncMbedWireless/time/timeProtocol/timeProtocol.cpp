@@ -292,10 +292,33 @@ bool hardwareCorrection(void){
 	}
 	return false;	
 }
+void stateManagement(){
+	if(timeProt.state!=TIMEPROT_IDLE){
+		if((xTaskGetTickCount()-timeProt.timePreviousState)>TIMOUTSTATE/portTICK_RATE_MS){//time out 
+			timeProt.timePreviousState=xTaskGetTickCount();
+			sendHMI("WARNING TIMEOUT arrived"); 
 
+			switch(timeProt.state){
+			#ifdef MASTERMODE
+				case TIMEPROT_DELAYREQUEST:
+					sync();
+					//delayResponse(timeProt.previousId);
+				break;
+			#else
+				case TIMEPROT_DELAYRESPONSE:
+					delayRequest();
+				break;
+			#endif
+				default:
+					sendHMI("ERROR incorrect state");
+				break;
+			}
+		}
+	}
+}
 void timeProtocolTask(void){
 	Disable_global_interrupt();
-		
+
 	#ifdef MASTERMODE
 		uint8_t i ;
 		for(i=0;i<=MAX_SLAVE_CLOCK;i++){
@@ -335,28 +358,41 @@ void timeProtocolTask(void){
 	timeProt.delay.halfmillis=0;
 	timeProt.delay.sign=true;
 	timeProt.waitIdentifier=false;
-	timeProt.synchroTime=NULL;
-	vSemaphoreCreateBinary(timeProt.synchroTime);
+	timeProt.synchroTimeReceive=NULL;
+	timeProt.synchroTimeSendSync=NULL;
+	vSemaphoreCreateBinary(timeProt.synchroTimeReceive);
+	vSemaphoreCreateBinary(timeProt.synchroTimeSendSync);
 	Enable_global_interrupt();
-	#ifdef SLAVEMODE
+	/*#ifdef SLAVEMODE
 	delayRequest();
 	#else
 	sync();
 	#endif
-	
+	*/
+	timeProt.state=TIMEPROT_IDLE;	
 	while(1){
 		//sendHMI("time protocol task.");
 			//pc.printf("timeprotocol task");
-			if(timeProt.synchroTime!=NULL){
-				sender();
-				if( xSemaphoreTake(timeProt.synchroTime,500/portTICK_RATE_MS) == pdTRUE ){
-					vTaskDelay(100/portTICK_RATE_MS);
-					receiver();
+			sender();
+			#ifdef MASTERMODE		
+			if(timeProt.state!=TIMEPROT_IDLE){
+			#endif
+			
+				if(timeProt.synchroTimeReceive!=NULL){
+				
+					if( xSemaphoreTake(timeProt.synchroTimeReceive,100/portTICK_RATE_MS) == pdTRUE )	{
+						//vTaskDelay(100/portTICK_RATE_MS);//wait to receive alll th edata
+						receiver();
+					}
 					
 				}
-					
+				
+			#ifdef MASTERMODE
 			}
-			correction();	
+			
+			#endif
+			stateManagement();
+			//correction();	
 	}	 
 	vTaskDelay(500/portTICK_RATE_MS);
 }
@@ -364,28 +400,21 @@ void timeProtocolTask(void){
 
 
 void sender(void){
-	#ifdef MASTERMODE
-	uint8_t i;
-	for(i=1;i<=MAX_SLAVE_CLOCK;i++){
-		taskENTER_CRITICAL();
-		unsigned long int timeSender=timeProt.saveTime[i].second;
-		taskEXIT_CRITICAL();
-		if(timeSender!=0){
-			//printf("id : %d  , delay response time second : %lu",i,timeSender);
-			delayResponse(i);
+		#ifdef MASTERMODE
+		
+		if(timeProt.synchroTimeSendSync!=NULL){
+			if( xSemaphoreTake(timeProt.synchroTimeSendSync,portMAX_DELAY) == pdTRUE ){//stay here until sync request
+				if(timeProt.state==TIMEPROT_IDLE){
+						networkFlush();
+						sync();
+				}
+				else{
+					sendHMI("WARNING sync request!");	
+				}
+			}
 		}
-	}
-	if(xTaskGetTickCount()-saveSync>(TIMESYNC/portTICK_RATE_MS)){
-		saveSync=xTaskGetTickCount();
-		sync();
-	}
-	#else
-	if(xTaskGetTickCount()-saveDRequest>(TIMEDELAYREQUEST/portTICK_RATE_MS)){
-		saveDRequest=xTaskGetTickCount();
-		delayRequest();
-	}
-	#endif
-
+			
+		#endif
 }
 void printfClock(Clock clock){
 			if(clock.sign==true){
@@ -429,13 +458,25 @@ void updateClock(void){
 		}
 		timeProt.correction.previousSignOffset=timeProt.offset.sign;
 		Clock timeCopy;
-		readClock(&timeCopy);
-
-
-		
+		/////////////////protected
+		readClock(&timeCopy);		
 		timeCopy=sumClock(timeCopy,timeProt.offset);//add offset
 		writeClock(timeCopy);
-		
+		/////////////////
+		static bool state;
+		state=stateLed;
+		if(timeManage.halfmillis<(RTC_FREQ/2)){//all 500ms
+			stateLed=LOW;
+		}
+		else{
+			stateLed=HIGH;
+		}
+		if(state!=stateLed){
+			led = stateLed;
+			//	if(synchroLed!=NULL){
+			//		xSemaphoreGiveFromISR( synchroLed,NULL);
+			//	}
+		}
 		if(timeProt.offset.sign==true){
 			sprintf(messageHMIOffset,"		update clock offset: +%lus,%ld[+%lus,%lu ms,~%lu us]	t: %lu,%lu",timeProt.offset.second,(long unsigned int)timeProt.offset.halfmillis,timeProt.offset.second,timeProt.offset.halfmillis/32,(timeProt.offset.halfmillis%32)*31,timeCopy.second,timeCopy.halfmillis);
 		}
@@ -443,6 +484,13 @@ void updateClock(void){
 			sprintf(messageHMIOffset,"		update clock offset: -%lus,%ld[-%lus,%lums,~%lu us]	t: %lu,%lu",timeProt.offset.second,(long unsigned int)timeProt.offset.halfmillis,timeProt.offset.second,timeProt.offset.halfmillis/32,(timeProt.offset.halfmillis%32)*31,timeCopy.second,timeCopy.halfmillis);
 		}
 		sendHMI(messageHMIOffset);
+}
+void crcErrorsend(void){
+	
+	Type type=CRCERROR;
+	send(type,0,NULL);
+	sendHMI("	crc cmd send");
+	
 }
 void receiver(){
 			#ifdef SLAVEMODE
@@ -462,76 +510,144 @@ void receiver(){
 					data.id=networkRead();
 					data.type=(Type)networkRead();
 							switch (data.type){
-								#ifdef SLAVEMODE
-									case SYNC:
-										sendHMI("	sync receive");
-										data.length=networkRead();
-										for(i=0;i<data.length;i++){
-											data.data[i]=networkRead();
-										}
-										data.crc=networkRead();
-										//networkFlush();
-										if(calculCRCID(data.type,data.length,data.data,data.id)!=data.crc){
+									case CRCERROR:
+									data.crc=networkRead();
 											
-											sendHMI("erreur crc");
-											return;
-										}
-										else{	
-											timeMaster.second=data.data[0]|(data.data[1]<<8);
-											timeMaster.halfmillis=data.data[2]|(data.data[3]<<8);
-											timeMaster=sumClock(timeMaster,timeProt.delay);
-											timeProt.offset=subClock(timeMaster,timeProt.rxSync);//on calcul le temps de calcul
-											updateClock();
-											sendHMI("	sync completed");
-											networkFlush();
+											if(calculCRCID(data.type,0,NULL,data.id)!=data.crc){
+												sendHMI("ERROR CRC");
+												crcErrorsend();
+												
+											}
+											else{
+												sendHMI("	CRC cmd receive");
+												switch (timeProt.state){
 
+													case TIMEPROT_IDLE:
+													//do nothing
+											
+													break;
+													case TIMEPROT_SYNCSTATE:
+													//not use
+											
+													break;
+													#ifdef MASTERMODE
+													case TIMEPROT_DELAYREQUEST:
+														sync();
+													break;
+													#else
+													case TIMEPROT_DELAYRESPONSE:
+														delayRequest();
+													break;
+													#endif
+												}
+											}
+									break;
+								#ifdef SLAVEMODE
+								
+									case SYNC:
+										if(timeProt.state==TIMEPROT_IDLE){
+											sendHMI("	sync receive");
+											data.length=networkRead();
+											for(i=0;i<data.length;i++){
+												data.data[i]=networkRead();
+											}
+											data.crc=networkRead();
+											//networkFlush();
+											if(calculCRCID(data.type,data.length,data.data,data.id)!=data.crc){
+												crcErrorsend();
+												sendHMI("erreur crc");
+												return;
+											}
+											else{	
+												timeProt.t1.second=data.data[0]|(data.data[1]<<8);
+												timeProt.t1.halfmillis=data.data[2]|(data.data[3]<<8);
+												timeProt.t1.sign=true;
+												timeProt.t2.second=timeProt.rxSync.second;
+												timeProt.t2.halfmillis=timeProt.rxSync.halfmillis;
+												timeProt.t2.sign=true;
+												//timeMaster=sumClock(timeMaster,timeProt.delay);
+												//timeProt.offset=subClock(timeMaster,timeProt.rxSync);//on calcul le temps de calcul
+												//updateClock();
+												//sendHMI("	sync completed");
+												//networkFlush();
+												delayRequest();
+												timeProt.state=TIMEPROT_DELAYRESPONSE;
+												timeProt.timePreviousState=xTaskGetTickCount();
+
+											}
+										}
+										else{
+											sendHMI("ERROR sync receive but in the wrong state");	
+											timeProt.state=TIMEPROT_IDLE;	
+											timeProt.timePreviousState=xTaskGetTickCount();									
 										}
 									break;
 									case DELAYRESPONSE:
-										data.length=networkRead();
-										for(i=0;i<data.length;i++){
-											data.data[i]=networkRead();
-										}
-										data.crc=networkRead();
-										//networkFlush();
-										if(calculCRCID(data.type,data.length,data.data,data.id)!=data.crc){
-											networkFlush();
-											sendHMI("erreur crc");
-											return;
-										}
-										sendHMI("	delay response receive");
-
-										if(data.data[0]==IDDEVICE){
-											//time receive master
-											t2.second=data.data[1]|(data.data[2]<<8);
-											t2.halfmillis=data.data[3]|(data.data[4]<<8);
-											//time send master
-											t3.second=data.data[5]|(data.data[6]<<8);
-											t3.halfmillis=data.data[7]|(data.data[8]<<8);
-											t2subt1=subClock(t2,timeProt.tx);
-											t4subt3=subClock(timeProt.rxDelay,t3);
-
-								
-											delayL=sumClock(t2subt1,t4subt3);									
-											timeProt.delay.second=delayL.second/2;
-											timeProt.delay.halfmillis=delayL.halfmillis/2;
-											timeProt.offset=subClock(t2subt1,t4subt3);
-											timeProt.offset.second=timeProt.offset.second/2;
-											timeProt.offset.halfmillis=timeProt.offset.halfmillis/2;
-											updateClock();
+										if(timeProt.state==TIMEPROT_DELAYRESPONSE){
+											data.length=networkRead();
+											for(i=0;i<data.length;i++){
+												data.data[i]=networkRead();
+											}
+											data.crc=networkRead();
+											//networkFlush();
+											if(calculCRCID(data.type,data.length,data.data,data.id)!=data.crc){
+												networkFlush();
+												crcErrorsend();
+												sendHMI("erreur crc");
+												return;
+											}
 											
-											if(timeProt.delay.sign==true){
-												sprintf(messageHMIDelay,"		update delay: +%lus,%u ms,~%lu us",timeProt.delay.second,timeProt.delay.halfmillis/32,(timeProt.delay.halfmillis%32)*31);
+											sendHMI("	delay response receive");
+
+											if(data.data[0]==IDDEVICE){
+												timeProt.state=TIMEPROT_IDLE;
+												timeProt.timePreviousState=xTaskGetTickCount();
+												//time receive master
+												timeProt.t4.second=data.data[1]|(data.data[2]<<8);
+												timeProt.t4.halfmillis=data.data[3]|(data.data[4]<<8);
+												timeProt.t4.sign=true;
+												/*pc.printf("t1");
+												printfClock(timeProt.t1);
+												pc.printf("t2");
+												printfClock(timeProt.t2);
+												pc.printf("t3");
+												printfClock(timeProt.t3);
+												pc.printf("t4");
+												printfClock(timeProt.t4);
+												*/
+												//time send master
+												//t3.second=data.data[5]|(data.data[6]<<8);
+												//t3.halfmillis=data.data[7]|(data.data[8]<<8);
+												t2subt1=subClock(timeProt.t2,timeProt.t1);
+												t4subt3=subClock(timeProt.t4,timeProt.t3);								
+												delayL=sumClock(t2subt1,t4subt3);									
+												timeProt.delay.second=delayL.second/2;
+												timeProt.delay.halfmillis=delayL.halfmillis/2;
+												
+												timeProt.offset=subClock(t4subt3,t2subt1);
+												timeProt.offset.second=timeProt.offset.second/2;
+												timeProt.offset.halfmillis=timeProt.offset.halfmillis/2;
+												updateClock();
+											
+												if(timeProt.delay.sign==true){
+													sprintf(messageHMIDelay,"		update delay: +%lus,%u ms,~%lu us",timeProt.delay.second,timeProt.delay.halfmillis/32,(timeProt.delay.halfmillis%32)*31);
+												}
+												else{
+													sprintf(messageHMIDelay,"		update delay: -%lus,%u ms,~%lu us",timeProt.delay.second,timeProt.delay.halfmillis/32,(timeProt.delay.halfmillis%32)*31);
+												}
+												sendHMI(messageHMIDelay);
+												networkFlush();
+												sendHMI("	delay response completed");
 											}
 											else{
-												sprintf(messageHMIDelay,"		update delay: -%lus,%u ms,~%lu us",timeProt.delay.second,timeProt.delay.halfmillis/32,(timeProt.delay.halfmillis%32)*31);
+												sendHMI("	delay response not for me");	
 											}
-											sendHMI(messageHMIDelay);
-											networkFlush();
-											sendHMI("	delay response completed");
 										}
 										else{
-											sendHMI("	delay response not for me");	
+											sendHMI("ERROR delay response receive but wrong state ");
+											timeProt.state=TIMEPROT_IDLE;
+											timeProt.timePreviousState=xTaskGetTickCount();
+											return;
 										}
 											
 									break;
@@ -544,23 +660,35 @@ void receiver(){
 									
 								#else
 									case DELAYREQUEST:
-									
-										data.crc=networkRead();
-										//printf("Type:%d , id:%d, crc:%d.",data.type, data.id,data.crc );
-										if(calculCRCID(data.type,0,NULL,data.id)!=data.crc){
-											taskENTER_CRITICAL();
-											timeProt.saveTime[data.id].second=0;
-											taskEXIT_CRITICAL();
-											networkFlush();
-											sendHMI("	Erreur crc");
-											return;
+										if(timeProt.state==DELAYREQUEST){
+											data.crc=networkRead();
+											//printf("Type:%d , id:%d, crc:%d.",data.type, data.id,data.crc );
+										/*	if(calculCRCID(data.type,0,NULL,data.id)!=data.crc){
+												taskENTER_CRITICAL();
+												timeProt.saveTime[data.id].second=0;
+												taskEXIT_CRITICAL();
+												networkFlush();
+												crcErrorsend();
+												sendHMI("	Erreur crc");
+												return;
+											}
+											else{*/
+												sendHMI("	delay request receive");
+												delayResponse(data.id);
+												timeProt.previousId=data.id;
+												
+												timeProt.state=TIMEPROT_IDLE;
+												timeProt.timePreviousState=xTaskGetTickCount();
+												//pc.printf("id:%d",data.id);
+											//}
+										
 										}
 										else{
-											sendHMI("	delay request receive");
-											//pc.printf("id:%d",data.id);
+											sendHMI("ERROR delay request receive but wrong state ");
+											timeProt.state=TIMEPROT_IDLE;
+											timeProt.timePreviousState=xTaskGetTickCount();
+											return;
 										}
-										
-										
 									break;
 								#endif
 								default:
@@ -570,7 +698,7 @@ void receiver(){
 							}		
 				}
 				
-			}		
+			}
 }
 #ifdef MASTERMODE
 void sync(void){
@@ -583,6 +711,8 @@ void sync(void){
 	sendP[2]=(uint8_t)(timeSave.halfmillis&0x00FF);
 	sendP[3]=(uint8_t)((timeSave.halfmillis>>8)&0x00FF);
 	send(type,4,sendP);
+	timeProt.state=TIMEPROT_DELAYREQUEST;
+	timeProt.timePreviousState=xTaskGetTickCount();
 	sendHMI("	sync send");
 }
 void delayResponse(uint8_t id){
@@ -606,20 +736,21 @@ void delayResponse(uint8_t id){
 	send(type,9,sendP);
 	sprintf(messageHMI,"	delay response send (id: %d)",id);
 	sendHMI(messageHMI);
+	timeProt.state=TIMEPROT_IDLE;
+	timeProt.timePreviousState=xTaskGetTickCount();
 }
 #endif
+
 #ifdef SLAVEMODE
 void delayRequest(void){
-	Type type=DELAYREQUEST;
-
-	readClock(&timeProt.tx);
-	//pc.printf("timeCounter:%ld\r\n",RTC->MODE0.COUNT.bit.COUNT);
-	send(type,0,NULL);
-
 	
+	Type type=DELAYREQUEST;
+	readClock(&timeProt.t3);
+	send(type,0,NULL);
 	sendHMI("	delay request send");
 }
 #endif
+
 void send(const Type type,const uint8_t length,const uint8_t* data){
 		uint8_t i;
 		uint8_t j=0;
@@ -635,9 +766,8 @@ void send(const Type type,const uint8_t length,const uint8_t* data){
 			send[3+i+j]=data[i];
 		}
 		send[3+i+j]=calculCRC(type,length,data);
-
+		vTaskDelay(500/portTICK_RATE_MS);
 		networkTx(send,length+4+j);
-
 }
 uint8_t calculCRC(const Type type,const uint8_t length,const uint8_t* data){
 	return calculCRCID(type,length,data,IDDEVICE);

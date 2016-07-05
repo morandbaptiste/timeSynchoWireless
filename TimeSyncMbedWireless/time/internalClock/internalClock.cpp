@@ -59,12 +59,12 @@ void isrInternalClok(void){
 			Disable_global_interrupt();
 			//printf("+");
 			static bool state;
-			state=stateLed;
+			
 			
 
 			timeManage.halfmillis+=VALUE_TIMER;
 
-		
+			state=stateLed;
 			if(timeManage.halfmillis<(RTC_FREQ/2)){//all 500ms
 				stateLed=LOW;
 			}

@@ -6,7 +6,7 @@
  */ 
 #include "ppsGPS.h"
 //InterruptIn pps(PA28);
-
+static int nPPS; 
 char messageHMIError[60];
 /** Callback function for the EXTINT driver, called when an external interrupt
  *  detection occurs.
@@ -15,7 +15,15 @@ char messageHMIError[60];
 void ppsISR(void)
 {	
 	//pc.printf("pps\r\n");
-		
+	if(nPPS>=TIMESYNC){
+		nPPS=0;
+		if(timeProt.synchroTimeSendSync!=NULL){
+			xSemaphoreGiveFromISR(timeProt.synchroTimeSendSync,NULL);
+		}
+	}	
+	else{
+		nPPS++;
+	}
 	//Disable_global_interrupt();
 	Clock timeCopy={0,0,true};
 	//Disable_global_interrupt();

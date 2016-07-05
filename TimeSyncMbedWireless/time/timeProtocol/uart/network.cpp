@@ -19,9 +19,6 @@ void ISRNetworkReception(uint8_t e){
 	 uint16_t rx;
 	  if((e&TRX_IRQ_TRX_END)==TRX_IRQ_TRX_END){
 			//pc.printf(" end \r\n");
-	  }
-	
-	 if(e==8){
 
 		#ifdef RADIO
 		 while(radio.available()){
@@ -39,8 +36,8 @@ void ISRNetworkReception(uint8_t e){
 			}
 
 			if(rx==HEADER){
-				if(timeProt.synchroTime!=NULL){
-					xSemaphoreGiveFromISR(timeProt.synchroTime,NULL);
+				if(timeProt.synchroTimeReceive!=NULL){
+					xSemaphoreGiveFromISR(timeProt.synchroTimeReceive,NULL);
 				}
 				timeProt.waitIdentifier=true;
 
@@ -131,6 +128,7 @@ void networkTx(const uint8_t send[],const uint8_t length){
 		radio.beginTransmission();
 		radio.write((uint8_t*)send,length);
 		radio.endTransmission();
+	
 	#endif
 }
 uint8_t networkRead(void){

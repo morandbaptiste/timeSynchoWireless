@@ -37,9 +37,19 @@ typedef enum enumType
 	DELAYREQUEST = 2,
 	DELAYRESPONSE = 3,
 	ACK=4,
-	PING=5
+	PING=5,
+	CRCERROR=6
+	
 	  
 }Type;
+
+enum StateTimeProtocol {
+	TIMEPROT_IDLE,
+	TIMEPROT_SYNCSTATE,
+	TIMEPROT_DELAYREQUEST,
+	TIMEPROT_DELAYRESPONSE,
+	
+};
 /************************************************************************/
 /* STRUCTURE                                                            */
 /************************************************************************/
@@ -71,6 +81,7 @@ typedef struct structCorrection{
 	uint8_t indiceMoySoftCor;
 	uint8_t indiceFull;
 	bool previousSignOffset;
+	
 
 }Correction;
 /** 
@@ -84,6 +95,7 @@ typedef struct structCorrection{
 typedef struct strucTimeProt{
 	#ifdef MASTERMODE
 	volatile Clock saveTime[MAX_SLAVE_CLOCK+1];
+	uint8_t previousId;
 	#endif
 	#ifdef SLAVEMODE
 	Clock tx;
@@ -91,12 +103,20 @@ typedef struct strucTimeProt{
 	Clock rxDelay;
 	Clock rx;
 	#endif
+	portTickType timePreviousState;
 	bool waitIdentifier;
 	bool waitType;
 	Clock delay;
-	xSemaphoreHandle synchroTime;
+	xSemaphoreHandle synchroTimeReceive;
+	xSemaphoreHandle synchroTimeSendSync;
 	Clock offset;
 	Correction correction;
+	StateTimeProtocol state;
+	Clock t1;
+	Clock t2;
+	Clock t3;
+	Clock t4;
+	//xSemaphoreHandle synchroTime;
 	
 	
 	

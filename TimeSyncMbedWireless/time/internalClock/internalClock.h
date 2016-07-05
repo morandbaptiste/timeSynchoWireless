@@ -37,6 +37,8 @@ extern volatile int timeCorrection;
 extern volatile int timeCorr;
 extern volatile int valueCor;
 extern struct rtc_module rtc_instance;
+extern volatile bool stateLed;
+extern DigitalOut led;
 /************************************************************************/
 /* function                                                             */
 /************************************************************************/

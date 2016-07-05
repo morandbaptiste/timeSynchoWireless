@@ -13,7 +13,7 @@
     <OutputFileExtension>.elf</OutputFileExtension>
     <OutputDirectory>$(MSBuildProjectDirectory)\$(Configuration)</OutputDirectory>
     <AssemblyName>AtmelStudio6_2</AssemblyName>
-    <Name>AtmelStudio6_2</Name>
+    <Name>TimeSyncMbedWirelless</Name>
     <RootNamespace>AtmelStudio6_2</RootNamespace>
     <ToolchainFlavour>Native</ToolchainFlavour>
     <KeepTimersRunning>true</KeepTimersRunning>

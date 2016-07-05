@@ -224,9 +224,9 @@ time/ppsGPS/ppsGPS.d \
 time/timeProtocol/timeProtocol.d \
 HMI/hmi.d
 
-OUTPUT_FILE_PATH +=TimeSyncMbed.elf
+OUTPUT_FILE_PATH +=TimeSyncMbedWirelless.elf
 
-OUTPUT_FILE_PATH_AS_ARGS +=TimeSyncMbed.elf
+OUTPUT_FILE_PATH_AS_ARGS +=TimeSyncMbedWirelless.elf
 
 ADDITIONAL_DEPENDENCIES:=
 
@@ -420,14 +420,14 @@ all: $(OUTPUT_FILE_PATH) $(ADDITIONAL_DEPENDENCIES)
 $(OUTPUT_FILE_PATH): $(OBJS) $(USER_OBJS) $(OUTPUT_FILE_DEP) $(LIB_DEP) $(LINKER_SCRIPT_DEP)
 	@echo Building target: $@
 	@echo Invoking: ARM/GNU Linker : 4.9.3
-	$(QUOTE)C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-g++.exe$(QUOTE) -o$(OUTPUT_FILE_PATH_AS_ARGS) $(OBJS_AS_ARGS) $(USER_OBJS) $(LIBS) -mthumb -Wl,-Map="TimeSyncMbed.map" -Wl,--start-group -lm  -Wl,--end-group -L"..\\Device_Startup"  -Wl,--gc-sections -mcpu=cortex-m0plus -L.././mbed/TARGET_SAMR21G18A/TOOLCHAIN_GCC_ARM  .././mbed/TARGET_SAMR21G18A/TOOLCHAIN_GCC_ARM/board.o .././mbed/TARGET_SAMR21G18A/TOOLCHAIN_GCC_ARM/cmsis_nvic.o .././mbed/TARGET_SAMR21G18A/TOOLCHAIN_GCC_ARM/mbed_overrides.o .././mbed/TARGET_SAMR21G18A/TOOLCHAIN_GCC_ARM/retarget.o .././mbed/TARGET_SAMR21G18A/TOOLCHAIN_GCC_ARM/startup_samr21.o .././mbed/TARGET_SAMR21G18A/TOOLCHAIN_GCC_ARM/system_samr21.o  -lmbed  -T.././mbed/TARGET_SAMR21G18A/TOOLCHAIN_GCC_ARM/samr21g18a.ld -Wl,--gc-sections --specs=nano.specs -u _printf_float -u _scanf_float -Wl,--wrap,main -Wl,--cref -lstdc++ -lsupc++ -lm -lgcc -Wl,--start-group -lc -lc -lnosys -Wl,--end-group  
+	$(QUOTE)C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-g++.exe$(QUOTE) -o$(OUTPUT_FILE_PATH_AS_ARGS) $(OBJS_AS_ARGS) $(USER_OBJS) $(LIBS) -mthumb -Wl,-Map="TimeSyncMbedWirelless.map" -Wl,--start-group -lm  -Wl,--end-group -L"..\\Device_Startup"  -Wl,--gc-sections -mcpu=cortex-m0plus -L.././mbed/TARGET_SAMR21G18A/TOOLCHAIN_GCC_ARM  .././mbed/TARGET_SAMR21G18A/TOOLCHAIN_GCC_ARM/board.o .././mbed/TARGET_SAMR21G18A/TOOLCHAIN_GCC_ARM/cmsis_nvic.o .././mbed/TARGET_SAMR21G18A/TOOLCHAIN_GCC_ARM/mbed_overrides.o .././mbed/TARGET_SAMR21G18A/TOOLCHAIN_GCC_ARM/retarget.o .././mbed/TARGET_SAMR21G18A/TOOLCHAIN_GCC_ARM/startup_samr21.o .././mbed/TARGET_SAMR21G18A/TOOLCHAIN_GCC_ARM/system_samr21.o  -lmbed  -T.././mbed/TARGET_SAMR21G18A/TOOLCHAIN_GCC_ARM/samr21g18a.ld -Wl,--gc-sections --specs=nano.specs -u _printf_float -u _scanf_float -Wl,--wrap,main -Wl,--cref -lstdc++ -lsupc++ -lm -lgcc -Wl,--start-group -lc -lc -lnosys -Wl,--end-group  
 	@echo Finished building target: $@
-	"C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-objcopy.exe" -O binary "TimeSyncMbed.elf" "TimeSyncMbed.bin"
-	"C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-objcopy.exe" -O ihex -R .eeprom -R .fuse -R .lock -R .signature  "TimeSyncMbed.elf" "TimeSyncMbed.hex"
-	"C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-objcopy.exe" -j .eeprom --set-section-flags=.eeprom=alloc,load --change-section-lma .eeprom=0 --no-change-warnings -O binary "TimeSyncMbed.elf" "TimeSyncMbed.eep" || exit 0
-	"C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-objdump.exe" -h -S "TimeSyncMbed.elf" > "TimeSyncMbed.lss"
-	"C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-objcopy.exe" -O srec -R .eeprom -R .fuse -R .lock -R .signature  "TimeSyncMbed.elf" "TimeSyncMbed.srec"
-	"C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-size.exe" "TimeSyncMbed.elf"
+	"C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-objcopy.exe" -O binary "TimeSyncMbedWirelless.elf" "TimeSyncMbedWirelless.bin"
+	"C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-objcopy.exe" -O ihex -R .eeprom -R .fuse -R .lock -R .signature  "TimeSyncMbedWirelless.elf" "TimeSyncMbedWirelless.hex"
+	"C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-objcopy.exe" -j .eeprom --set-section-flags=.eeprom=alloc,load --change-section-lma .eeprom=0 --no-change-warnings -O binary "TimeSyncMbedWirelless.elf" "TimeSyncMbedWirelless.eep" || exit 0
+	"C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-objdump.exe" -h -S "TimeSyncMbedWirelless.elf" > "TimeSyncMbedWirelless.lss"
+	"C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-objcopy.exe" -O srec -R .eeprom -R .fuse -R .lock -R .signature  "TimeSyncMbedWirelless.elf" "TimeSyncMbedWirelless.srec"
+	"C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\arm\arm-gnu-toolchain\bin\arm-none-eabi-size.exe" "TimeSyncMbedWirelless.elf"
 	
 	
 
@@ -439,5 +439,5 @@ $(OUTPUT_FILE_PATH): $(OBJS) $(USER_OBJS) $(OUTPUT_FILE_DEP) $(LIB_DEP) $(LINKER
 clean:
 	-$(RM) $(OBJS_AS_ARGS) $(EXECUTABLES)  
 	-$(RM) $(C_DEPS_AS_ARGS)   
-	rm -rf "TimeSyncMbed.elf" "TimeSyncMbed.a" "TimeSyncMbed.hex" "TimeSyncMbed.bin" "TimeSyncMbed.lss" "TimeSyncMbed.eep" "TimeSyncMbed.map" "TimeSyncMbed.srec"
+	rm -rf "TimeSyncMbedWirelless.elf" "TimeSyncMbedWirelless.a" "TimeSyncMbedWirelless.hex" "TimeSyncMbedWirelless.bin" "TimeSyncMbedWirelless.lss" "TimeSyncMbedWirelless.eep" "TimeSyncMbedWirelless.map" "TimeSyncMbedWirelless.srec"
 	
